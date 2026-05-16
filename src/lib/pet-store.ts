@@ -172,6 +172,15 @@ async function getSupabase(): Promise<SupabaseClientLike | null> {
   }) as unknown as SupabaseClientLike;
 }
 
+/**
+ * Returns "production" when both Supabase env vars are present, else "demo".
+ * Surfaces honestly in /api/health and /api/leaderboard so the UI cannot
+ * accidentally pretend demo data is real live revenue.
+ */
+export function getRuntimeMode(): "demo" | "production" {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? "production" : "demo";
+}
+
 function dbProfileToProfile(row: any): FounderProfile {
   return {
     id: row.id,

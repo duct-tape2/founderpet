@@ -8,7 +8,7 @@
 cd /Users/ijeong-geun/founderpet
 npm test           # 26/26 expected
 npm run typecheck  # clean expected
-npm run build      # 9 routes generated expected
+npm run build      # 10 routes generated expected (incl. /api/health)
 ```
 
 Live (replace `$HOST` with prod or local):
@@ -30,6 +30,8 @@ curl -o /dev/null -s -w "%{http_code}\n" "$HOST/api/pet?userId=demo"
 curl -o /dev/null -s -w "%{http_code}\n" "$HOST/api/leaderboard"
 # /api/events (GET)
 curl -o /dev/null -s -w "%{http_code}\n" "$HOST/api/events?userId=demo&limit=5"
+# /api/health (mode + integrations)
+curl -s "$HOST/api/health" | python3 -c "import sys,json; d=json.load(sys.stdin); print('health:', d['ok'], 'mode:', d['mode'], 'integrations:', d['integrations'])"
 
 # POST /api/events idempotency
 KEY=qa_$(date +%s)
