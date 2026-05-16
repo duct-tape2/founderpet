@@ -6,6 +6,22 @@ export interface WatchPayload {
   userId: string;
   handle: string;
   updatedAt: string;
+  /** Flat fields per public Watch spec — easiest for tiny complication consumers. */
+  level: number;
+  stage: PetStage;
+  mood: PetMood;
+  exp: number;
+  /** progress to next stage as percent (0–100). */
+  progress: number;
+  headline: string;
+  nextBestAction: string;
+  businessPulse: {
+    build: number;
+    outcome: number;
+    momentum: number;
+    launchReadiness: number;
+  };
+  /** Nested pet object for backwards-compatible Watch app builds. */
   pet: {
     stage: PetStage;
     mood: PetMood;
@@ -14,6 +30,7 @@ export interface WatchPayload {
     progressToNextStage: number;
     progressToNextLevel: number;
   };
+  /** Rich pulse for the web dashboard and existing native consumers. */
   pulse: {
     headline: string;
     nextAction: string;
@@ -85,11 +102,25 @@ export function buildWatchPayloadFromParts(
   events: FounderEvent[],
   updatedAt = new Date().toISOString(),
 ): WatchPayload {
+  const headlineText = headline(snapshot);
   return {
     version: 1,
     userId: profile.id,
     handle: profile.handle,
     updatedAt,
+    level: snapshot.level,
+    stage: snapshot.stage,
+    mood: snapshot.mood,
+    exp: snapshot.exp,
+    progress: snapshot.progressToNextStage,
+    headline: headlineText,
+    nextBestAction: snapshot.businessPulse.nextBestAction,
+    businessPulse: {
+      build: snapshot.businessPulse.buildScore,
+      outcome: snapshot.businessPulse.outcomeScore,
+      momentum: snapshot.businessPulse.momentumScore,
+      launchReadiness: snapshot.businessPulse.launchReadiness,
+    },
     pet: {
       stage: snapshot.stage,
       mood: snapshot.mood,
@@ -99,7 +130,7 @@ export function buildWatchPayloadFromParts(
       progressToNextLevel: snapshot.progressToNextLevel,
     },
     pulse: {
-      headline: headline(snapshot),
+      headline: headlineText,
       nextAction: snapshot.businessPulse.nextBestAction,
       trustScore: snapshot.trustScore,
       buildScore: snapshot.businessPulse.buildScore,
