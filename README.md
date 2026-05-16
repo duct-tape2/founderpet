@@ -1,160 +1,190 @@
-# AI Tamago 🥚🐣
-A 100% local, LLM-generated and driven virtual pet with thoughts, feelings and feedback. Revive your fond memories of Tamagotchi! https://ai-tamago.fly.dev/
+# FounderPet 🐣 → 🐉
 
-All ascii animations are generated using chatgpt (included prompts in the repo). 
+> A virtual pet that grows from your **real business outcomes**. GitHub commits, AI agent runs, revenue, tasks — all feed your pet's evolution from egg to dragon.
 
-Have questions? Join [AI Stack devs](https://discord.gg/TsWCNVvRP5) and find me in #ai-tamago channel.
+For solo founders, indie hackers, and AI builders who want a **3-second business status signal** that's actually fun to check.
 
-**Demo** 🪄
+[Live demo](https://founderpet.dev) · [Leaderboard](https://founderpet.dev/leaderboard) · [GitHub](https://github.com/duct-tape2/founderpet)
 
-https://github.com/ykhli/AI-tamago/assets/3489963/8d7cb2ac-537a-45d4-98a5-1802b773e364
+---
 
-## Stack
+## What it is
 
-### Local Mode
-- 🦙 Inference: [Ollama](https://github.com/jmorganca/ollama), with options to use OpenAI or [Replicate](https://replicate.com/)
-- 🔔 Game state: [Inngest](https://www.inngest.com/)
-- 💻 Transactional & vector database: [Supabase pgvector](https://supabase.com/docs/guides/database/extensions/pgvector)
-- 🧠 LLM Orchestration: [Langchain.js](https://js.langchain.com/docs/)
-- 🖼️ App logic: [Next.js](https://nextjs.org/)
-- 🧮 Embeddings generation: [Transformer.js](https://github.com/xenova/transformers.js) and [
-all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2)
-- 🖌️ UI: [Magic Patterns](https://www.magicpatterns.com/) and [Vercel v0](https://v0.dev/) 
+A pet that lives on your web dashboard and Apple Watch. It evolves stage by stage as your business actually moves:
 
-### Prod Mode
-All of above, plus: 
-- 🔐 Auth & User Management: [Clerk](https://clerk.com/)
-- ☁️  Hosting: [Fly](https://fly.io/)
-- 🥇 Rate Limiting: [Upstash](https://upstash.com/)
+| Signal | Source | Effect on pet |
+|---|---|---|
+| Revenue | Stripe / Gumroad / Polar / Lemon Squeezy / PayPal / manual | +$1 = +1 EXP (capped at +500 per event) + celebrating mood |
+| Code | GitHub push webhook | +2 EXP per commit |
+| AI activity | Claude / Codex / n8n agent run | +1 EXP per successful run |
+| Tasks | Manual or API | +10 EXP per done, blocked → mood: blocked |
+| Approvals | Manual or API | +5 / +15 / +30 EXP by risk |
+| Content published | GitHub release / Substack / X | +20 EXP per piece |
 
-## Overview
-- 🚀 [Quickstart](#quickstart)
-- 💻 [Deployment Guide](#deployment-guide)
+**No revenue + stale tasks** → hunger goes up, mood: hungry.
+**Blocked tasks** → mood: blocked.
+**Big sale + recent commits** → mood: celebrating 🎉
 
-## Prerequisites
-
-- [Install Docker](https://www.docker.com/get-started)
-
-## Quickstart
-
-### 1. Fork and Clone repo
-
-Fork the repo to your Github account, then run the following command to clone the repo:
+## Evolution path
 
 ```
-git clone git@github.com:[YOUR_GITHUB_ACCOUNT_NAME]/AI-tamago.git
+🥚 EGG  (Level 1)
+   ↓ 200 EXP
+🐣 CHICK  (Level 2-3)
+   ↓ 400 EXP
+🐤 BIRD  (Level 4-7)
+   ↓ 800 EXP
+🦅 EAGLE  (Level 8-12) — strong predator
+   ↓ 1,300 EXP
+✨ GRIFFIN  (Level 13-20) — mythical
+   ↓ 2,100 EXP
+🐉 DRAGON  (Level 21+) — final form
 ```
 
-### 2. Install dependencies
-```
-cd ai-tamago
+## Why it works
+
+- **Real signals.** No vanity metrics. Your pet only grows if your business actually moves.
+- **Public leaderboard.** See top founders by MRR + EXP. Your pet visible at `/u/[handle]`.
+- **3D + Apple Watch.** Full 3D rendered pet on web. Native SwiftUI/SceneKit version coming for Apple Watch.
+- **Stripe/Gumroad/GitHub auto-sync.** Configure once, never enter data manually again.
+
+## Quick start (local dev)
+
+```bash
+git clone https://github.com/duct-tape2/founderpet.git
+cd founderpet
 npm install
+npm run dev
+# open http://localhost:3000
 ```
 
-All client side tamagotchi code is in Tamagotchi.tsx
-
-### 3. Install Ollama
-Instructions are [here](https://github.com/jmorganca/ollama#macos).
-
-### 4. Run Supabase locally
-1. Install Supabase CLI
-
-```
-brew install supabase/tap/supabase
+Run tests:
+```bash
+npm test          # vitest, 18 tests for pet-engine
+npm run build     # production build verify
 ```
 
-2. Start Supabase
-
-Make sure you are under `/ai-tamago` directory and run:
+## Architecture
 
 ```
-supabase start
+┌─────────────────────┐
+│   Web Dashboard     │  Next.js 13 + React Three Fiber + Tailwind
+│   /                 │
+│   /leaderboard      │
+│   /u/[handle]       │
+└──────────┬──────────┘
+           │
+           ↓
+┌─────────────────────┐    ┌─────────────────────────┐
+│   Pet Engine        │    │   Webhook Receivers     │
+│   src/lib/pet-      │←───│   /api/webhook/stripe   │
+│   engine.ts         │    │   /api/webhook/github   │
+│   18 unit tests     │    │   /api/webhook/gumroad  │
+└──────────┬──────────┘    └─────────────────────────┘
+           │
+           ↓
+┌─────────────────────┐
+│   Public API        │
+│   GET /api/pet      │  ← Apple Watch polls every 60s
+│   GET /api/leaderboard │  ← realtime jitter every 4s
+│   POST /api/pet     │  ← manual event recording
+└─────────────────────┘
 ```
 
-Tips: To run migrations or reset database -- seed.sql and migrations will run
-`supabase db reset`
+Tech:
+- **Frontend**: Next.js 13 (App Router), Tailwind CSS, TypeScript
+- **3D**: React Three Fiber + Drei, GLTF models from Poly Pizza (CC0/CC-BY)
+- **Pet engine**: Pure TypeScript, 18 unit tests passing (vitest)
+- **Webhooks**: HMAC-verified for GitHub, signature-verified for Stripe
+- **Mobile**: DPR + shadow + particle count auto-throttle on `<768px`
+- **Future**: Supabase (postgres + realtime), Clerk (auth), Fly.io (hosting)
 
-### 5. Fill in secrets
-Note: The secrets here are for your **local** supabase instance
+## Integrations
 
-```
-cp .env.local.example .env.local
-```
+All listed integrations route to `MetricEvent` events that flow through the same pet engine.
 
-Then get `SUPABASE_PRIVATE_KEY` by running
+| Provider | Webhook URL | Status |
+|---|---|---|
+| Stripe | `POST /api/webhook/stripe` | ✅ Implemented |
+| GitHub | `POST /api/webhook/github` | ✅ Implemented (HMAC verified) |
+| Gumroad | `POST /api/webhook/gumroad` | 🚧 Planned |
+| Polar.sh | `POST /api/webhook/polar` | 🚧 Planned |
+| Lemon Squeezy | `POST /api/webhook/lemonsqueezy` | 🚧 Planned |
+| PayPal | `POST /api/webhook/paypal` | 🚧 Planned |
+| GitHub Sponsors | `POST /api/webhook/github-sponsors` | 🚧 Planned |
+| Toss / 카카오페이 | `POST /api/webhook/toss` | 🚧 Planned (Korean SMB) |
+| Manual | `POST /api/pet` with eventType | ✅ Implemented |
 
-```
-supabase status
-```
-
-Copy `service_role key` and save it as `SUPABASE_PRIVATE_KEY` in `.env.local`
-
-### 6. Set up Inngest
-`npx inngest-cli@latest dev`
-
-Make sure your app is up and running -- Inngest functions (which are used to drive game state) should register automatically. 
-
-
-### 7. Run app locally
-
-Now you are ready to test out the app locally! To do this, simply run `npm run dev` under the project root and visit `http://localhost:3000`.
-
-## Deployment Guide
-
-Now you have played with the AI tamago locally -- it's time to deploy it somewhere more permanent so you can access it anytime! 
-
-**0. Choose which model you want to use in production**
-- If you want to test out using Chatgpt in prod, simply remove `LLM_MODEL=ollama` from `.env.local` and fill in `OPENAI_API_KEY`
-- If you want to try [Replicate](https://replicate.com/), set `LLM_MODEL=replicate_llama` and fill in `REPLICATE_API_TOKEN`
-- If you want to deploy Ollama yourself, you can follow this awesome guide -- [Scaling Large Language Models to zero with Ollama](https://fly.io/blog/scaling-llm-ollama/). It is possible to run Ollama on a `performance-4x` Fly VM (CPU) with `100gb` volume, but if you can get access to GPUs they are much faster. Join Fly's GPU waitlist [here](https://fly.io/gpu) if you don't yet have access!
-
-
-**1. Switch to `deploy` branch -- this branch includes everything you need to deploy an app like [this](https://ai-tamago.fly.dev/).**
-
-   
-```git co deploy```
-
-
-This branch contains a multi-tenancy-ready (thanks to Clerk) app, which means every user can get their own AI-tamago, and has token limit built in -- you can set how many times a user can send requests in the app (see `ratelimit.ts`)
-
-**2. Move to Supabase Cloud:**
-
-- Create a Supabase project [here](https://supabase.com/), then go to Project Settings -> API. Fill out secrets in `.env.local`
-- `SUPABASE_URL` is the URL value under "Project URL"
-- `SUPABASE_PRIVATE_KEY` is the key starts with `ey` under Project API Keys
-- Copy Supabase project id, which you can find from the url https://supabase.com/dashboard/project/[project-id]
-
-From your Ai-tamago project root, run:
-
-```
-supabase link --project-ref [insert project-id]
-supabase migration up
-supabase db reset --linked
+### Stripe setup
+```bash
+# 1. Stripe Dashboard → Webhooks → Add endpoint
+# 2. URL: https://yourdomain.com/api/webhook/stripe
+# 3. Events: charge.succeeded, invoice.paid, customer.subscription.created
+# 4. .env.local:
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-**3. Create Upstash Redis instance for rate limiting**
+When creating a Stripe charge, set:
+```js
+metadata: { founderpet_user_id: "your-user-id" }
+```
 
-This will make sure no one user calls any API too many times and taking up all the inference workloads. We are using Upstash's [awesome rate limiting SDK](https://upstash.com/blog/upstash-ratelimit) here.
+### GitHub setup
+```bash
+# 1. Repo settings → Webhooks → Add webhook
+# 2. URL: https://yourdomain.com/api/webhook/github
+# 3. Secret: matches GITHUB_WEBHOOK_SECRET env var
+# 4. Events: push, pull_request
+GITHUB_WEBHOOK_SECRET=...
+```
 
-- Sign in to [Upstash](https://upstash.com/)
-- Under "Redis" on the top nav, click on "Create Database"
-- Give it a name, and then select regions and other options based on your preference. Click on "Create"
-- Scroll down to "REST API" section and click on ".env". Now you can copy paste both environment variables (`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`) to your .env.local
+## Apple Watch (Phase 2)
 
-**4. Now you are ready to deploy everything on Fly.io!**
-- Register an account on fly.io and then [install flyctl](https://fly.io/docs/hands-on/install-flyctl/)
-- Run `fly launch` under project root. This will generate a `fly.toml` that includes all the configurations you will need
-- Run `fly scale memory 512` to scale up the fly vm memory for this app.
-- Run `fly deploy --ha=false` to deploy the app. The --ha flag makes sure fly only spins up one instance, which is included in the free plan.
-- For any other non-localhost environment, the existing Clerk development instance should continue to work. You can upload the secrets to Fly by running `cat .env.local | fly secrets import`
-- If you want to make this a real product, you should create a prod environment under the [current Clerk instance](https://dashboard.clerk.com/). For more details on deploying a production app with Clerk, check out their documentation [here](https://clerk.com/docs/deployments/overview). **Note that you will likely need to manage your own domain and do domain verification as part of the process.**
-- Create a new file `.env.prod` locally and fill in all the production-environment secrets. Remember to update `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` by copying secrets from Clerk's production instance -`cat .env.prod | fly secrets import` to upload secrets.
+Native SwiftUI + SceneKit app polls `/api/pet?userId=xxx` every 60s.
 
-If you have questions, join [AI Stack devs](https://discord.gg/TsWCNVvRP5) and find me in #ai-tamago channel.
+Source code in [`apps/ios/WorkPet Watch App/`](https://github.com/duct-tape2/founderpet) (separately maintained, will be merged from sibling [workpet](https://github.com/duct-tape2/workpet) repo).
 
-## Other Resources 
-- [Adding auth with Clerk](https://clerk.com/docs/quickstarts/nextjs) - takes < 5mins
-- [Inngest deployment guide](https://www.inngest.com/docs/deploy)https://www.inngest.com/docs/deploy
-- [Running Ollama on Fly.io](https://fly.io/blog/scaling-llm-ollama/)https://fly.io/blog/scaling-llm-ollama/
-- [Run a next.js app on Fly.io](https://fly.io/docs/js/frameworks/nextjs/#:~:text=Deploy%20an%20existing%20NextJS%20app&text=First%2C%20install%20flyctl%2C%20your%20Fly,the%20root%20of%20your%20application.&text=Creating%20app%20in%20%2FUsers%2Fme,source%20code%20Detected%20a%20Next.)
+Features:
+- Glance at pet level + stage on wrist
+- Quick task complete / approval action
+- Today's MRR + commits count
 
+## Roadmap
+
+- [x] Pet engine with 18 unit tests
+- [x] 3D rendered pet (6 stages, Poly Pizza CC0/CC-BY)
+- [x] Mobile responsive (DPR + shadow throttling)
+- [x] Stripe + GitHub webhook receivers
+- [x] Public leaderboard (mock data, realtime jitter)
+- [x] Public profile pages `/u/[handle]`
+- [ ] Supabase persistence + realtime
+- [ ] Clerk auth + onboarding flow
+- [ ] Gumroad / Polar / Lemon webhook receivers
+- [ ] Apple Watch native app (SwiftUI)
+- [ ] Pet "trading" (NFT-free, just bragging rights)
+
+## Credits
+
+- 3D models: [Poly Pizza](https://poly.pizza) (CC0 / CC-BY)
+- Inspired by [AI-tamago](https://github.com/ykhli/AI-tamago) (MIT) — kept production infrastructure pattern
+- Original pet evolution mechanics: [WorkPet/다마고치 프로젝트](https://github.com/duct-tape2/workpet) (this author)
+
+## License
+
+MIT
+
+---
+
+## 한국어
+
+**FounderPet**은 솔로 파운더, 인디 해커, AI 빌더를 위한 사업 진행도 펫입니다.
+
+GitHub 커밋, AI 에이전트 실행, 매출(Stripe/Gumroad/Polar 자동 연동), 작업 완료 → 모두 펫의 EGG → DRAGON 진화에 반영.
+
+기존 펫 앱과 달리 **사업 멀티 소스**를 통합해서, 손목/웹에서 3초 안에 내 사업이 살아있는지 확인할 수 있습니다.
+
+**바이럴 한 줄**: 애플워치 집에서 놀리지 말고 여기다 활용해서 돈 벌어보세요.
+
+타겟: Claude, Codex, ChatGPT, Gemini 사용자 + Apple Watch + 솔로 파운더.
+
+데모: https://founderpet.dev

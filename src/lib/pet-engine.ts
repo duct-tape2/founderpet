@@ -232,13 +232,13 @@ export function calculateGrowth(
     .reduce((sum, m) => sum + m.value, 0);
   const businessHealthScore = clamp(Math.log10(totalRevenue + 1) * 25);
 
-  // Mood
+  // Mood — revenue + recent activity takes priority over tired
   let mood: PetMood = PetMood.HAPPY;
   if (blocked > 0) mood = PetMood.BLOCKED;
   else if (hunger > 50) mood = PetMood.HUNGRY;
-  else if (energy < 20) mood = PetMood.TIRED;
   else if (totalRevenue > 0 && recentDone > 0) mood = PetMood.CELEBRATING;
   else if (active > 0) mood = PetMood.FOCUSED;
+  else if (energy < 20) mood = PetMood.TIRED;
 
   // Next evolution
   const nextThreshold = nextEvolutionThreshold(level);
