@@ -60,9 +60,14 @@ npm run dev
 
 Run tests:
 ```bash
-npm test          # vitest, 18 tests for pet-engine
+npm test          # vitest, 26 tests (engine + market-ready event flow)
+npm run typecheck # tsc --noEmit
 npm run build     # production build verify
 ```
+
+Phase 2 docs:
+- `docs/MARKET_READY.md` — event model, API surface, trust score, deploy checklist
+- `docs/workpet-integration.md` — connect the WorkPet iOS / Apple Watch app to FounderPet's `/api/watch`
 
 ## Architecture
 
