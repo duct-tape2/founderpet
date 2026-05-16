@@ -49,13 +49,15 @@ describe("calculateGrowth - EXP rules", () => {
     expect(s.exp).toBe(20);
   });
 
-  it("revenue event adds USD as EXP (capped at 500)", () => {
+  it("manual revenue is capped per event AND discounted (Phase 2 anti-gaming)", () => {
     const metrics = [
       { id: "1", type: MetricType.MANUAL_REVENUE, value: 100, recordedAt: new Date() },
-      { id: "2", type: MetricType.MANUAL_REVENUE, value: 1000, recordedAt: new Date() }, // capped to 500
+      { id: "2", type: MetricType.MANUAL_REVENUE, value: 1000, recordedAt: new Date() }, // capped to 500 raw
     ];
     const s = calculateGrowth([], [], metrics, []);
-    expect(s.exp).toBe(600); // 100 + 500
+    // Manual revenue multiplier: max(0.45, 0.65) * 0.75 = 0.4875
+    // $100 -> round(100 * 0.4875) = 49 ; $1000 -> round(500 * 0.4875) = 244
+    expect(s.exp).toBe(293);
   });
 
   it("github commits add 2 EXP each", () => {
@@ -102,14 +104,16 @@ describe("calculateGrowth - mood rules", () => {
 });
 
 describe("calculateGrowth - level progression", () => {
-  it("200 EXP → level 3 (CHICK)", () => {
+  it("manual revenue alone keeps the pet small (no fake leaderboard farming)", () => {
+    // $200 manual revenue gets discounted by anti-gaming multiplier, so it should NOT
+    // be enough to reach CHICK. To climb stages you need verified Stripe-style events.
     const metrics = [{ id: "m1", type: MetricType.MANUAL_REVENUE, value: 200, recordedAt: new Date() }];
     const s = calculateGrowth([], [], metrics, []);
-    expect(s.level).toBe(3);
-    expect(s.stage).toBe(PetStage.CHICK);
+    expect(s.level).toBe(1);
+    expect(s.stage).toBe(PetStage.EGG);
   });
 
-  it("2000 EXP → level 21 DRAGON", () => {
+  it("4 x $500 manual revenue stays under DRAGON because manual revenue is discounted", () => {
     const metrics = Array.from({ length: 4 }, (_, i) => ({
       id: `m${i}`,
       type: MetricType.MANUAL_REVENUE,
@@ -117,9 +121,10 @@ describe("calculateGrowth - level progression", () => {
       recordedAt: new Date(),
     }));
     const s = calculateGrowth([], [], metrics, []);
-    expect(s.exp).toBe(2000);
-    expect(s.level).toBe(21);
-    expect(s.stage).toBe(PetStage.DRAGON_OR_PHOENIX);
+    // Each $500 manual -> round(500 * 0.4875) = 244 ; 4 events -> 976.
+    // Verified Stripe revenue would have hit DRAGON; manual stops at EAGLE.
+    expect(s.exp).toBe(976);
+    expect(s.stage).toBe(PetStage.EAGLE);
   });
 });
 

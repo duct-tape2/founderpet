@@ -1,42 +1,25 @@
 import { NextResponse } from "next/server";
-import { MOCK_LEADERBOARD } from "@/lib/mock-leaderboard";
+import { getLeaderboard, getRuntimeMode } from "@/lib/pet-store";
 
-/**
- * Public leaderboard API.
- *
- * Query params:
- *   ?limit=10 (default 10, max 100)
- *   ?sort=exp|revenue|commits (default: exp)
- *   ?period=all|month|week (default: all)
- *
- * Production: query Supabase materialized view.
- * Current: returns mock data with simulated jitter.
- */
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") || "10"), 100);
-  const sort = (searchParams.get("sort") || "exp") as "exp" | "revenue" | "commits";
+  const limit = Number(searchParams.get("limit") ?? 20);
+  const leaderboard = await getLeaderboard(Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 100) : 20);
+  const mode = getRuntimeMode();
 
-  // Simulate realtime jitter
-  const entries = MOCK_LEADERBOARD.map((e) => ({
-    ...e,
-    exp: e.exp + Math.floor(Math.random() * 50 - 10),
-    monthlyRevenue: e.monthlyRevenue + Math.floor(Math.random() * 200 - 50),
-  }));
-
-  // Sort
-  const sortKey: Record<typeof sort, (e: typeof entries[number]) => number> = {
-    exp: (e) => e.exp,
-    revenue: (e) => e.monthlyRevenue,
-    commits: (e) => e.commits,
-  };
-  entries.sort((a, b) => sortKey[sort](b) - sortKey[sort](a));
-
-  return NextResponse.json({
-    entries: entries.slice(0, limit).map((e, i) => ({ ...e, rank: i + 1 })),
-    total: entries.length,
-    sort,
-    updatedAt: new Date().toISOString(),
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      mode,
+      generatedAt: new Date().toISOString(),
+      scoring: "EXP weighted by trust + verified revenue + streak. Manual/unverified revenue is discounted.",
+      notice: mode === "demo"
+        ? "Demo mode — Supabase is not connected. Numbers are seeded for the demo founder only."
+        : undefined,
+      leaderboard,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

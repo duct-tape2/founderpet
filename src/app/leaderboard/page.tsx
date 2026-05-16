@@ -16,8 +16,8 @@ export default function LeaderboardPage() {
             <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
               ← Back to dashboard
             </Link>
-            <h1 className="text-4xl font-semibold tracking-tight mt-2">Public Leaderboard</h1>
-            <p className="text-sm text-zinc-500 mt-1">Top founders by EXP. Updates every 4 seconds.</p>
+            <h1 className="text-4xl font-semibold tracking-tight mt-2">Trust-weighted Leaderboard</h1>
+            <p className="text-sm text-zinc-500 mt-1">Real events only. Manual revenue is discounted. Verified Stripe/GitHub signals score full.</p>
           </div>
           <div className="flex gap-2">
             <button className="text-xs px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-700">All time</button>

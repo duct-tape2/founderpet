@@ -1,143 +1,164 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MOCK_LEADERBOARD, formatRevenue, stageEmoji, type LeaderboardEntry } from "@/lib/mock-leaderboard";
+import { useEffect, useMemo, useState } from "react";
+
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  handle: string;
+  displayName: string;
+  projectName: string;
+  avatarEmoji: string;
+  stage: string;
+  mood: string;
+  level: number;
+  exp: number;
+  trustScore: number;
+  leaderboardScore: number;
+  verifiedRevenue: number;
+  revenue30d: number;
+  streakDays: number;
+}
+
+function stageEmoji(stage: string): string {
+  if (stage === "DRAGON") return "🐉";
+  if (stage === "GRIFFIN") return "✨";
+  if (stage === "EAGLE") return "🦅";
+  if (stage === "BIRD") return "🐤";
+  if (stage === "CHICK") return "🐣";
+  return "🥚";
+}
+
+function money(value: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+}
+
+const FALLBACK: LeaderboardEntry[] = [
+  {
+    rank: 1,
+    userId: "demo",
+    handle: "duct-tape2",
+    displayName: "Duct Tape Founder",
+    projectName: "FounderPet",
+    avatarEmoji: "🐉",
+    stage: "CHICK",
+    mood: "celebrating",
+    level: 2,
+    exp: 107,
+    trustScore: 86,
+    leaderboardScore: 461,
+    verifiedRevenue: 49,
+    revenue30d: 49,
+    streakDays: 1,
+  },
+];
 
 export default function Leaderboard() {
-  const [board, setBoard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
+  const [board, setBoard] = useState<LeaderboardEntry[]>(FALLBACK);
+  const [status, setStatus] = useState<"loading" | "live" | "fallback">("loading");
 
-  // Simulate realtime updates - random tiny variations every 4s
   useEffect(() => {
-    const interval = setInterval(() => {
-      setBoard((prev) =>
-        prev
-          .map((entry) => {
-            const delta = (Math.random() - 0.45) * 50;
-            return {
-              ...entry,
-              exp: Math.max(0, entry.exp + Math.floor(delta)),
-              monthlyRevenue: Math.max(0, entry.monthlyRevenue + Math.floor(delta * 10)),
-              commits: entry.commits + (Math.random() > 0.6 ? 1 : 0),
-              agentRuns: entry.agentRuns + (Math.random() > 0.5 ? Math.floor(Math.random() * 3) : 0),
-            };
-          })
-          .sort((a, b) => b.exp - a.exp)
-          .map((entry, i) => ({ ...entry, rank: i + 1 })),
-      );
-    }, 4000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const response = await fetch("/api/leaderboard?limit=10", { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const rows = Array.isArray(payload) ? payload : payload.leaderboard;
+        if (!cancelled && Array.isArray(rows) && rows.length > 0) {
+          setBoard(rows);
+          setStatus("live");
+        }
+      } catch {
+        if (!cancelled) setStatus("fallback");
+      }
+    }
+
+    load();
+    const interval = setInterval(load, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
+  const highestScore = useMemo(() => Math.max(1, ...board.map((entry) => entry.leaderboardScore)), [board]);
+
   return (
-    <div className="rounded-2xl bg-zinc-900/40 border border-zinc-800/60 backdrop-blur-xl overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 flex items-center justify-between border-b border-zinc-800/60">
-        <div className="flex items-center gap-3">
+    <div className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-900/45 backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-800/70 px-5 py-4">
+        <div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <h2 className="text-sm font-semibold text-zinc-200">Live Leaderboard</h2>
+            <div className={`h-2 w-2 rounded-full ${status === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
+            <h2 className="text-sm font-semibold text-zinc-200">Trust-weighted Leaderboard</h2>
           </div>
-          <span className="text-[10px] uppercase tracking-[0.15em] text-zinc-600 font-mono">
-            Top Founders · Real Revenue
-          </span>
+          <p className="mt-1 text-[11px] text-zinc-500">Verified revenue + EXP + streak. Manual revenue is discounted.</p>
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-zinc-600 font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-          UPDATING
-        </div>
+        <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-zinc-600">{status}</div>
       </div>
 
-      {/* Column headers */}
-      <div className="grid grid-cols-[40px_1fr_80px_100px_60px_60px] gap-3 px-5 py-2 text-[10px] uppercase tracking-wider text-zinc-600 font-mono border-b border-zinc-900">
+      <div className="grid grid-cols-[42px_1fr_70px_88px_68px] gap-3 border-b border-zinc-900 px-5 py-2 text-[10px] font-mono uppercase tracking-wider text-zinc-600 md:grid-cols-[42px_1fr_70px_96px_80px_70px]">
         <div>#</div>
-        <div>Founder · Project</div>
+        <div>Founder</div>
         <div className="text-right">Level</div>
-        <div className="text-right">MRR</div>
-        <div className="text-right">EXP</div>
-        <div className="text-right">7d</div>
+        <div className="text-right">Revenue</div>
+        <div className="hidden text-right md:block">Trust</div>
+        <div className="text-right">Score</div>
       </div>
 
-      {/* Rows */}
       <div className="divide-y divide-zinc-900/80">
-        {board.slice(0, 10).map((entry) => (
-          <Row key={entry.handle} entry={entry} highlighted={entry.handle === "@duct-tape2"} />
+        {board.map((entry) => (
+          <div
+            key={entry.userId}
+            className={`grid grid-cols-[42px_1fr_70px_88px_68px] gap-3 px-5 py-3 transition-colors md:grid-cols-[42px_1fr_70px_96px_80px_70px] ${
+              entry.handle === "duct-tape2" ? "bg-amber-500/[0.06] ring-1 ring-inset ring-amber-500/20" : "hover:bg-zinc-800/30"
+            }`}
+          >
+            <div className="font-mono text-sm text-zinc-500">{String(entry.rank).padStart(2, "0")}</div>
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700/70 bg-zinc-950 text-base">
+                  {entry.avatarEmoji || stageEmoji(entry.stage)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium text-zinc-200">@{entry.handle}</span>
+                    <span>{stageEmoji(entry.stage)}</span>
+                  </div>
+                  <div className="truncate text-[11px] text-zinc-500">{entry.projectName}</div>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-sm text-zinc-200">L{entry.level}</div>
+              <div className="text-[10px] font-mono uppercase text-zinc-600">{entry.mood}</div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-sm text-emerald-300">{money(entry.verifiedRevenue)}</div>
+              <div className="text-[10px] font-mono text-zinc-600">30d {money(entry.revenue30d)}</div>
+            </div>
+            <div className="hidden text-right md:block">
+              <div className="font-mono text-sm text-zinc-300">{entry.trustScore}</div>
+              <div className="mt-1 h-1 overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-full rounded-full bg-zinc-100" style={{ width: `${entry.trustScore}%` }} />
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-sm text-zinc-300">{entry.leaderboardScore.toLocaleString()}</div>
+              <div className="mt-1 h-1 overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-full rounded-full bg-amber-300" style={{ width: `${(entry.leaderboardScore / highestScore) * 100}%` }} />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* Footer */}
-      <div className="px-5 py-3 border-t border-zinc-800/60 flex items-center justify-between text-xs">
-        <span className="text-zinc-500">Showing top 10 · </span>
-        <button className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-          View all 1,247 founders →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Row({ entry, highlighted }: { entry: LeaderboardEntry; highlighted?: boolean }) {
-  return (
-    <div
-      className={`grid grid-cols-[40px_1fr_80px_100px_60px_60px] gap-3 px-5 py-3 items-center transition-all duration-300 ${
-        highlighted ? "bg-amber-500/[0.06] ring-1 ring-inset ring-amber-500/20" : "hover:bg-zinc-800/30"
-      }`}
-    >
-      {/* Rank */}
-      <div className="flex items-center gap-1.5">
-        <span className={`text-sm font-mono ${
-          entry.rank === 1 ? "text-amber-400" :
-          entry.rank === 2 ? "text-zinc-300" :
-          entry.rank === 3 ? "text-orange-400" :
-          "text-zinc-600"
-        }`}>
-          {entry.rank.toString().padStart(2, "0")}
-        </span>
-      </div>
-
-      {/* Founder + Project */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/50 flex items-center justify-center text-base shrink-0 relative">
-          {entry.avatar}
-          {entry.online && (
-            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-zinc-950" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className={`text-sm font-medium ${highlighted ? "text-amber-200" : "text-zinc-200"}`}>
-              {entry.handle}
-            </span>
-            <span className="text-base leading-none">{stageEmoji(entry.stage)}</span>
-          </div>
-          <div className="text-[11px] text-zinc-500 truncate">{entry.projectName}</div>
-        </div>
-      </div>
-
-      {/* Level */}
-      <div className="text-right">
-        <div className="text-sm font-mono text-zinc-200">L{entry.level}</div>
-        <div className="text-[10px] text-zinc-600 font-mono uppercase tracking-wider">{entry.stage.split("_")[0].toLowerCase()}</div>
-      </div>
-
-      {/* Monthly Revenue */}
-      <div className="text-right">
-        <div className="text-sm font-mono text-emerald-300">{formatRevenue(entry.monthlyRevenue)}</div>
-        <div className="text-[10px] text-zinc-600 font-mono">/ mo</div>
-      </div>
-
-      {/* EXP */}
-      <div className="text-right text-sm font-mono text-zinc-400">{entry.exp.toLocaleString()}</div>
-
-      {/* Weekly delta */}
-      <div className="text-right">
-        <span
-          className={`inline-flex items-center gap-0.5 text-xs font-mono ${
-            entry.weeklyDelta > 0 ? "text-emerald-400" : entry.weeklyDelta < 0 ? "text-red-400" : "text-zinc-500"
-          }`}
-        >
-          {entry.weeklyDelta > 0 ? "↑" : entry.weeklyDelta < 0 ? "↓" : "−"}
-          {Math.abs(entry.weeklyDelta).toFixed(1)}%
-        </span>
+      <div className="flex items-center justify-between border-t border-zinc-800/70 px-5 py-3 text-xs">
+        <span className="text-zinc-500">No fake jitter. Rows come from /api/leaderboard.</span>
+        <a href="/leaderboard" className="font-medium text-amber-300 hover:text-amber-200">
+          View full →
+        </a>
       </div>
     </div>
   );

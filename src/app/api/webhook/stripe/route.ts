@@ -1,115 +1,93 @@
-import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { NextResponse } from "next/server";
+import { EventSource, FounderEventKind } from "@/lib/pet-engine";
+import { recordFounderEvent } from "@/lib/pet-store";
 
-/**
- * Stripe webhook receiver.
- * Triggered on: charge.succeeded, invoice.paid, customer.subscription.created
- *
- * Production setup:
- *   1. Configure webhook in Stripe Dashboard → https://yourdomain.com/api/webhook/stripe
- *   2. Set STRIPE_WEBHOOK_SECRET env var
- *   3. Map Stripe customer.metadata.founderpet_user_id → your user
- *
- * On valid payment event → emit MetricEvent { type: MANUAL_REVENUE, value: amount }
- * → pet engine recalculates EXP/level/stage automatically.
- */
+export const dynamic = "force-dynamic";
 
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
-
-interface StripeEvent {
-  id: string;
-  type: string;
-  data: { object: any };
-  created: number;
+function safeEqual(expected: string, actual: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(actual);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-async function verifyStripeSignature(payload: string, signature: string | null): Promise<boolean> {
-  if (!STRIPE_WEBHOOK_SECRET) {
-    console.warn("STRIPE_WEBHOOK_SECRET not configured - allowing unsigned in dev");
-    return process.env.NODE_ENV !== "production";
-  }
+function verifyStripeSignature(rawBody: string, signature: string | null): boolean {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) return process.env.NODE_ENV !== "production";
   if (!signature) return false;
 
-  // Stripe-Signature header format: t=timestamp,v1=hmac
-  // For production: use stripe sdk constructEvent.
-  // This implementation is a placeholder that passes through in non-prod.
-  return true;
+  const parts = Object.fromEntries(
+    signature.split(",").map((part) => {
+      const [key, value] = part.split("=");
+      return [key, value];
+    }),
+  );
+  const timestamp = parts.t;
+  const actual = parts.v1;
+  if (!timestamp || !actual) return false;
+
+  const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
+  return safeEqual(expected, actual);
 }
 
-export async function POST(req: NextRequest) {
-  const payload = await req.text();
-  const signature = req.headers.get("stripe-signature");
+function amountToUsdLike(object: any): number {
+  const cents = object.amount_received ?? object.amount_paid ?? object.amount_total ?? object.amount;
+  if (typeof cents === "number" && Number.isFinite(cents)) return Math.max(0, cents / 100);
+  if (typeof object.amount === "string") return Math.max(0, Number(object.amount));
+  return 0;
+}
 
-  const valid = await verifyStripeSignature(payload, signature);
-  if (!valid) {
-    return NextResponse.json({ error: "invalid signature" }, { status: 400 });
+function userIdFromStripeObject(object: any): string {
+  return (
+    object.metadata?.founderpet_user_id ??
+    object.metadata?.userId ??
+    object.metadata?.user_id ??
+    object.client_reference_id ??
+    object.customer_email ??
+    "demo"
+  ).toString();
+}
+
+export async function POST(request: Request) {
+  const rawBody = await request.text();
+  const signature = request.headers.get("stripe-signature");
+
+  if (!verifyStripeSignature(rawBody, signature)) {
+    return NextResponse.json({ ok: false, error: "Invalid Stripe signature" }, { status: 401 });
   }
 
-  let event: StripeEvent;
+  let event: any;
   try {
-    event = JSON.parse(payload);
+    event = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json({ error: "invalid payload" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Extract user + amount based on event type
-  let userId: string | undefined;
-  let amount: number = 0;
-  let currency: string = "usd";
-
-  switch (event.type) {
-    case "charge.succeeded": {
-      const charge = event.data.object;
-      userId = charge.metadata?.founderpet_user_id;
-      amount = charge.amount / 100; // cents → dollars
-      currency = charge.currency;
-      break;
-    }
-    case "invoice.paid": {
-      const invoice = event.data.object;
-      userId = invoice.metadata?.founderpet_user_id || invoice.customer_email;
-      amount = invoice.amount_paid / 100;
-      currency = invoice.currency;
-      break;
-    }
-    case "customer.subscription.created":
-    case "customer.subscription.updated": {
-      const sub = event.data.object;
-      userId = sub.metadata?.founderpet_user_id;
-      amount = sub.items?.data?.[0]?.price?.unit_amount / 100 || 0;
-      currency = sub.currency || "usd";
-      break;
-    }
-    default:
-      return NextResponse.json({ received: true, ignored: true });
+  const supported = new Set(["checkout.session.completed", "payment_intent.succeeded", "invoice.paid", "charge.succeeded"]);
+  if (!supported.has(event.type)) {
+    return NextResponse.json({ ok: true, ignored: true, type: event.type });
   }
 
-  if (!userId || amount <= 0) {
-    return NextResponse.json({ received: true, ignored: true, reason: "no userId or amount" });
-  }
+  const object = event.data?.object ?? {};
+  const value = amountToUsdLike(object);
+  if (value <= 0) return NextResponse.json({ ok: true, ignored: true, reason: "zero_amount", type: event.type });
 
-  // TODO (Phase 2): persist MetricEvent to Supabase
-  // await supabase.from('events').insert({
-  //   user_id: userId,
-  //   type: 'manual_revenue',
-  //   value: amount,
-  //   metadata: { source: 'stripe', currency, stripe_event_id: event.id },
-  //   recorded_at: new Date(event.created * 1000).toISOString(),
-  // });
-
-  return NextResponse.json({
-    received: true,
-    userId,
-    amount,
-    currency,
-    expGained: Math.min(amount, 500), // capped per pet-engine rules
+  const result = await recordFounderEvent({
+    userId: userIdFromStripeObject(object),
+    kind: FounderEventKind.REVENUE,
+    source: EventSource.STRIPE,
+    value,
+    currency: String(object.currency ?? "usd").toUpperCase(),
+    verified: true,
+    confidence: 1,
+    externalId: event.id ?? object.id,
+    occurredAt: event.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString(),
+    metadata: {
+      stripeType: event.type,
+      stripeObjectId: object.id ?? null,
+      product: object.metadata?.product ?? null,
+    },
   });
-}
 
-export async function GET() {
-  return NextResponse.json({
-    endpoint: "stripe-webhook",
-    method: "POST",
-    events: ["charge.succeeded", "invoice.paid", "customer.subscription.created"],
-    docs: "https://github.com/duct-tape2/founderpet#stripe-integration",
-  });
+  return NextResponse.json({ ok: true, duplicate: result.duplicate, event: result.event, pet: result.state.snapshot });
 }
