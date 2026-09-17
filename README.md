@@ -169,6 +169,18 @@ Features:
 - Inspired by [AI-tamago](https://github.com/ykhli/AI-tamago) (MIT) — kept production infrastructure pattern
 - Original pet evolution mechanics: [WorkPet/다마고치 프로젝트](https://github.com/duct-tape2/workpet) (this author)
 
+## Repo Launch service
+
+Need a buyer-ready page for an existing public GitHub repo? I offer a fixed **$99 USD** Repo Launch service for worldwide English-language buyers.
+
+- [Service details](https://duct-tape2.github.io/repo-launch/?utm_source=github&utm_medium=readme&utm_campaign=founderpet)
+- [Public work](https://duct-tape2.github.io/work/)
+- [Storefront case study](https://duct-tape2.github.io/examples/storefront-starter-case-study/)
+- [Start a paid inquiry](https://github.com/duct-tape2/duct-tape2/issues/new?template=paid-inquiry.yml)
+- [Email the repo URL, intended buyer, and deadline](mailto:sks7178@gmail.com?subject=Repo%20Launch%20%2499%20inquiry&body=Public%20repo%20URL:%20%0AIntended%20buyer%20or%20outcome:%20)
+
+Scope is confirmed before private payment instructions are provided. No public checkout is represented as ready.
+
 ## License
 
 MIT
